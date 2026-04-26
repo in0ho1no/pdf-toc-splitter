@@ -233,7 +233,23 @@
 | 目次に載っていない項目（前書き、奥付等） | 記載しない |
 | ページ範囲が単一ページ | `N-N` と記述する（例: `- 序文: 1-1`） |
 
-### 2.5 使用フロー
+### 2.5 AI出力の暫定記法とバリデーションの関係
+
+AI生成の `toc.md` にはセクション1のフォーマット仕様に準拠しない暫定記法が含まれる場合がある。具体的には以下の2つである：
+
+- `<!-- offset: TODO -->` — AIがoffset値を算出できなかった場合
+- `0-0` のページ範囲 — ページ番号が判読不能だった場合
+
+これらはあくまでAI出力時の暫定記法であり、PDF分割スクリプト（セクション3）のバリデーションでは不正値として扱われる。人間が使用フロー（2.6節）のステップ5でこれらを修正してから分割スクリプトに渡すこと。
+
+スプリッターは以下のように扱う：
+
+| 暫定記法 | スプリッターの挙動 |
+|----------|-------------------|
+| `<!-- offset: TODO -->` | offset ディレクティブとして認識しない（通常のコメントとして無視される）。offset未指定として `0` が適用される |
+| `0-0` のページ範囲 | ページ番号正値チェック（1以上）でバリデーションエラーとなる |
+
+### 2.6 使用フロー
 
 ```
 1. 人間がPDFビューアで元PDFを開き、offset を算出する
@@ -241,9 +257,10 @@
 2. 人間が元PDFから目次ページ部分だけを切り出し、独立したPDFにする
 3. そのPDFをAI（Claude等）に読み込ませる際にこのプロンプトを併用する
 4. AIが出力した toc.md に offset ディレクティブを記入する
-   （AIが算出できない場合は人間が記入する）
+   （AIが算出できない場合は人間が記入する。TODO のままでは分割不可）
 5. toc.md を必要に応じて人間が微修正する
-   （[?] の解消、0-0 ページの修正、タイトルの調整等）
+   （[?] の解消、0-0 ページの修正、タイトルの調整等。
+    0-0 が残っているとバリデーションエラーになる）
 6. toc.md をPDF分割スクリプトに渡す
 ```
 
@@ -300,19 +317,19 @@ pdf-toc-splitter/
 ├── LICENSE
 ├── .gitignore
 ├── src/
-│   └── pdf_toc_splitter/
-│       ├── __init__.py
-│       ├── __main__.py            # python -m エントリーポイント
-│       ├── cli.py                 # argparse定義、main()
-│       ├── toc_parser.py          # 目次Markdownパーサー
-│       └── splitter.py            # PDF分割ロジック
+│   ├── pdf_toc_splitter/
+│   │   ├── __init__.py
+│   │   ├── __main__.py            # python -m エントリーポイント
+│   │   ├── cli.py                 # argparse定義、main()
+│   │   ├── toc_parser.py          # 目次Markdownパーサー
+│   │   └── splitter.py            # PDF分割ロジック
+│   └── tests/
+│       ├── test_toc_parser.py
+│       └── test_splitter.py
 ├── prompts/
 │   └── toc_extraction_prompt.md
 ├── examples/
 │   └── example_toc.md
-└── tests/
-    ├── test_toc_parser.py
-    └── test_splitter.py
 ```
 
 ### 3.4 モジュール構成
@@ -380,7 +397,7 @@ pdf-toc-splitter/
 
 テストフレームワーク: `pytest`
 
-### 4.1 toc_parser のテスト（`tests/test_toc_parser.py`）
+### 4.1 toc_parser のテスト（`src/tests/test_toc_parser.py`）
 
 #### 正常系
 
@@ -407,7 +424,7 @@ pdf-toc-splitter/
 
 - 同一階層のエントリ間にページギャップがある場合
 
-### 4.2 splitter のテスト（`tests/test_splitter.py`）
+### 4.2 splitter のテスト（`src/tests/test_splitter.py`）
 
 テスト用PDFは `pypdf` で動的に生成する（各ページにページ番号テキストを埋め込む）。
 
