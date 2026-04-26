@@ -81,9 +81,9 @@
 <!-- offset: N -->
 ```
 
-`N` は整数、または暫定値 `TODO`。意味は「印刷ページ番号に `N` を加算すると物理ページ番号になる」。
+`N` は整数、または暫定値 `TODO`。整数の場合の意味は「印刷ページ番号に `N` を加算すると物理ページ番号になる」。
 
-`TODO` はAIがoffset値を算出できなかった場合に使用する暫定記法である。`TODO` が残っている場合、スプリッターは offset ディレクティブとして認識せず通常のコメントとして無視する（offset未指定と同じく `0` が適用される）。人間がスプリッターに渡す前に整数値へ修正することを想定している。
+`TODO` はAIがoffset値を算出できなかった場合に使用する暫定記法である。スプリッターは `<!-- offset: TODO -->` を構文的に認識し、`0-0` と同様に暫定値の残留として扱う（1.6節参照）。`--validate-only` 時は警告、実分割時はエラーとなる。人間が実分割前に整数値へ修正することを想定している。
 
 #### 算出方法
 
@@ -189,7 +189,7 @@
 | インデント連続性 | インデントの飛び級がないこと（レベル1の次にレベル3は不可） |
 | 深さ上限 | ネストが3階層を超えないこと |
 | ページ範囲非重複 | 同一階層内でページ範囲が重複しないこと（`0-0` は本チェックをスキップ） |
-| 暫定値残留 | `0-0` のエントリが残っている場合、`--validate-only` 時は警告として報告し、実分割時はエラーとして処理を中断する |
+| 暫定値残留 | `0-0` のエントリまたは `offset: TODO` が残っている場合、`--validate-only` 時は警告として報告し、実分割時はエラーとして処理を中断する |
 
 #### 警告（処理続行）
 
@@ -252,7 +252,7 @@ AI生成の `toc.md` には以下の暫定記法が含まれる場合がある�
 
 | 暫定記法 | `--validate-only` 時 | 実分割時 |
 |----------|----------------------|----------|
-| `<!-- offset: TODO -->` | offset ディレクティブとして認識しない（通常コメントとして無視、offset `0` 適用） | 同左 |
+| `<!-- offset: TODO -->` | **警告**（暫定値が残っている旨を報告） | **エラー**（処理中断） |
 | `0-0` のページ範囲 | **警告**（暫定値が残っている旨を報告） | **エラー**（処理中断） |
 
 人間が使用フロー（2.6節）のステップ5でこれらを修正してから実分割に渡すことを想定している。
@@ -344,8 +344,8 @@ pdf-toc-splitter/
 #### `toc_parser.py`
 
 - `TocEntry` データクラス: タイトル、開始ページ、終了ページ、階層レベル、子エントリのリスト、元ファイルの行番号を保持。開始・終了ページが `0` の場合は暫定値（判読不能）を意味する
-- `parse_toc(filepath: str) -> tuple[list[TocEntry], int]`: 目次Markdownを解析し、ツリー構造のエントリリストとoffset値のタプルを返す
-- `validate_toc(entries: list[TocEntry], total_pages: int, offset: int, strict: bool = True) -> tuple[list[str], list[str]]`: エラーメッセージのリストと警告メッセージのリストのタプルを返す。`strict=True`（実分割時）では `0-0` エントリをエラーとし、`strict=False`（`--validate-only` 時）では警告とする
+- `parse_toc(filepath: str) -> tuple[list[TocEntry], int | None]`: 目次Markdownを解析し、ツリー構造のエントリリストとoffset値のタプルを返す。offset値は整数ディレクティブがあれば `int`、`<!-- offset: TODO -->` の場合は `None`、ディレクティブ自体がない場合は `0` を返す
+- `validate_toc(entries: list[TocEntry], total_pages: int, offset: int | None, strict: bool = True) -> tuple[list[str], list[str]]`: エラーメッセージのリストと警告メッセージのリストのタプルを返す。`strict=True`（実分割時）では `0-0` エントリおよび `offset=None`（TODO）をエラーとし、`strict=False`（`--validate-only` 時）では警告とする
 - `flatten_toc(entries: list[TocEntry], depth: int) -> list[TocEntry]`: 指定階層までフラット化する
 
 #### `splitter.py`
@@ -357,7 +357,7 @@ pdf-toc-splitter/
 
 #### `cli.py`
 
-- `main()`: CLIエントリーポイント。引数解析 → パース → `validate_toc` → `flatten_toc` → `build_output_plan` → `validate_output_plan` → `split_pdf` の制御フロー
+- `main()`: CLIエントリーポイント。引数解析 → パース → offset解決（CLI `--offset` 指定時はその値を使用、未指定時は `parse_toc` の戻り値を使用） → `validate_toc` → `flatten_toc` → `build_output_plan` → `validate_output_plan` → `split_pdf` の制御フロー
 
 ### 3.5 終了コード
 
@@ -414,6 +414,7 @@ pdf-toc-splitter/
 - 複数階層（depth 2, 3）の目次パース
 - 空行・HTMLコメント含みの目次パース
 - offset ディレクティブの読み取り（あり・なし・0指定・TODO指定）
+- `parse_toc` が offset 未指定時に `0`、TODO時に `None`、整数時に `int` を返すこと
 - 単一ページエントリ（`5-5`）
 - `0-0` 暫定値を含むエントリのパース
 
@@ -432,7 +433,9 @@ pdf-toc-splitter/
 #### 暫定値の扱い
 
 - `strict=True` 時: `0-0` エントリがエラーになること
+- `strict=True` 時: `offset=None`（TODO）がエラーになること
 - `strict=False` 時: `0-0` エントリが警告になること
+- `strict=False` 時: `offset=None`（TODO）が警告になること
 - `0-0` エントリに対してページ範囲整合・総ページ数・子範囲・重複チェックがスキップされること
 
 #### 警告系
@@ -469,7 +472,9 @@ pdf-toc-splitter/
 - `--dry-run`: ファイルが生成されず、一覧が標準出力に出ること
 - `--validate-only`: バリデーションのみ実行され、PDFが生成されないこと
 - `--validate-only` + `0-0` エントリ: 警告として報告されること
+- `--validate-only` + `offset: TODO`: 警告として報告されること
 - `--offset`: Markdown内 offset より CLI 指定が優先されること
+- `--offset` 指定時に Markdown内の `offset: TODO` がエラーにならないこと（CLI値で上書きされるため）
 - `--depth` の範囲外指定（0, 4以上）のエラーハンドリング
 
 #### 終了コード
