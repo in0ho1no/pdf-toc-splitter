@@ -204,6 +204,48 @@ class TestSplitPdf:
         filenames = [Path(f).name for f in output_files]
         assert filenames == ['01_Ch1_p1-3.pdf', '01-01_1.1_p1-2.pdf', '02_Ch2_p4-6.pdf']
 
+    def test_on_progress_called(self, tmp_path: Path) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        plan = [
+            (_make_entry('Ch1', 1, 4, line_no=1), '01_Ch1_p1-4.pdf'),
+            (_make_entry('Ch2', 5, 7, line_no=2), '02_Ch2_p5-7.pdf'),
+            (_make_entry('Ch3', 8, 10, line_no=3), '03_Ch3_p8-10.pdf'),
+        ]
+        calls: list[tuple[int, int, str]] = []
+
+        def cb(current: int, total: int, entry: TocEntry, filename: str) -> None:
+            calls.append((current, total, filename))
+
+        split_pdf(str(pdf_path), plan, str(tmp_path / 'output'), offset=0, on_progress=cb)
+        assert len(calls) == 3
+        assert calls[0] == (1, 3, '01_Ch1_p1-4.pdf')
+        assert calls[1] == (2, 3, '02_Ch2_p5-7.pdf')
+        assert calls[2] == (3, 3, '03_Ch3_p8-10.pdf')
+
+    def test_on_progress_args_correct(self, tmp_path: Path) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        entry = _make_entry('Ch1', 1, 5, line_no=1)
+        plan = [(entry, '01_Ch1_p1-5.pdf')]
+        received: list[tuple[int, int, TocEntry, str]] = []
+
+        def cb(current: int, total: int, e: TocEntry, filename: str) -> None:
+            received.append((current, total, e, filename))
+
+        split_pdf(str(pdf_path), plan, str(tmp_path / 'output'), offset=0, on_progress=cb)
+        assert received[0][0] == 1
+        assert received[0][1] == 1
+        assert received[0][2] is entry
+        assert received[0][3] == '01_Ch1_p1-5.pdf'
+
+    def test_on_progress_none_no_error(self, tmp_path: Path) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        plan = [(_make_entry('Ch1', 1, 5, line_no=1), '01_Ch1_p1-5.pdf')]
+        output_files = split_pdf(str(pdf_path), plan, str(tmp_path / 'output'), offset=0)
+        assert len(output_files) == 1
+
 
 class TestCli:
     def test_normal_exit_code_0(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -401,3 +443,35 @@ class TestCli:
         files = list(out_dir.glob('*.pdf'))
         assert len(files) == 1
         assert len(PdfReader(str(files[0])).pages) == 5
+
+    def test_progress_log_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+        out_dir = tmp_path / 'output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-o', str(out_dir)])
+        with pytest.raises(SystemExit):
+            main()
+        out = capsys.readouterr().out
+        assert '[INFO]   1/2:' in out
+        assert '[INFO]   2/2:' in out
+
+    def test_dry_run_duplicate_filename_exits_2(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        # 同一ページ範囲・サニタイズ後に同一ファイル名になるタイトル
+        toc_path.write_text('- Hello World: 1-5\n- Hello_World: 1-5\n', encoding='utf-8')
+        out_dir = tmp_path / 'output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '--dry-run', '-o', str(out_dir)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 2
+        assert '[ERROR]' in capsys.readouterr().out

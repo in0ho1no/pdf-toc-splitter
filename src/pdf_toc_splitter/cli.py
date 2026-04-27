@@ -9,7 +9,7 @@ from pathlib import Path
 from pypdf import PdfReader
 
 from pdf_toc_splitter.splitter import build_output_plan, split_pdf, validate_output_plan
-from pdf_toc_splitter.toc_parser import flatten_toc, parse_toc, validate_toc
+from pdf_toc_splitter.toc_parser import TocEntry, flatten_toc, parse_toc, validate_toc
 
 
 def main() -> None:
@@ -97,13 +97,14 @@ def main() -> None:
         sys.exit(0)
 
     # PDF分割
-    print('[INFO] Splitting...')
-    split_pdf(args.input_pdf, plan, args.output_dir, offset)
-
     total = len(plan)
-    for i, (entry, filename) in enumerate(plan, 1):
+
+    def _on_progress(current: int, total_count: int, entry: TocEntry, filename: str) -> None:
         page_count = entry.end_page - entry.start_page + 1
-        print(f'[INFO]   {i}/{total}: {filename} ({page_count} pages)')
+        print(f'[INFO]   {current}/{total_count}: {filename} ({page_count} pages)')
+
+    print('[INFO] Splitting...')
+    split_pdf(args.input_pdf, plan, args.output_dir, offset, on_progress=_on_progress)
 
     print(f'[INFO] Done. {total} files created in {args.output_dir}')
     sys.exit(0)
