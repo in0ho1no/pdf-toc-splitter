@@ -188,13 +188,13 @@
 | 子範囲が親範囲内 | 子エントリのページ範囲が親エントリのページ範囲に包含されること（`0-0` は本チェックをスキップ） |
 | インデント連続性 | インデントの飛び級がないこと（レベル1の次にレベル3は不可） |
 | 深さ上限 | ネストが3階層を超えないこと |
-| ページ範囲非重複 | 同一階層内でページ範囲が重複しないこと（`0-0` は本チェックをスキップ） |
 | 暫定値残留 | `0-0` のエントリまたは `offset: TODO` が残っている場合、`--validate-only` 時は警告として報告し、実分割時はエラーとして処理を中断する |
 
 #### 警告（処理続行）
 
 | 検証項目 | 説明 |
 |----------|------|
+| ページ範囲重複 | 同一階層内でページ範囲が重複している場合（`0-0` は本チェックをスキップ）。PDFはページ単位でしか分割できないため、1ページ内に複数セクションが存在する技術文書等では、隣接エントリが境界ページを共有することは正常な運用である。重複がある場合、該当ページは両方の出力PDFに含まれる |
 | ページ範囲ギャップ | 同一階層内で連続するエントリ間にカバーされないページがある場合 |
 | 連番桁あふれ | 子エントリ数が `10^prefix-digits` を超えた場合 |
 
@@ -353,11 +353,11 @@ pdf-toc-splitter/
 - `generate_filename(entry: TocEntry, index_label: str, offset: int, prefix_digits: int) -> str`: エントリからサニタイズ済みファイル名を生成する
 - `build_output_plan(entries: list[TocEntry], offset: int, prefix_digits: int) -> list[tuple[TocEntry, str]]`: フラット化済みエントリ一覧からファイル名を生成し、`(エントリ, ファイル名)` のリストを返す
 - `validate_output_plan(plan: list[tuple[TocEntry, str]]) -> list[str]`: 出力計画のファイル名重複を検証し、エラーメッセージのリストを返す。桁あふれが発生した場合は警告ログを出力する
-- `split_pdf(input_path: str, plan: list[tuple[TocEntry, str]], output_dir: str, offset: int) -> list[str]`: 出力計画に基づきPDFを分割し、出力ファイルパスのリストを返す
+- `split_pdf(input_path: str, plan: list[tuple[TocEntry, str]], output_dir: str, offset: int, on_progress: Callable[[int, int, TocEntry, str], None] | None = None) -> list[str]`: 出力計画に基づきPDFを分割し、出力ファイルパスのリストを返す。`on_progress` が指定されている場合、各ファイルの書き込み完了直後に `on_progress(current_index, total_count, entry, filename)` を呼び出す（1始まり）
 
 #### `cli.py`
 
-- `main()`: CLIエントリーポイント。引数解析 → パース → offset解決（CLI `--offset` 指定時はその値を使用、未指定時は `parse_toc` の戻り値を使用） → `validate_toc` → `flatten_toc` → `build_output_plan` → `validate_output_plan` → `split_pdf` の制御フロー
+- `main()`: CLIエントリーポイント。引数解析 → パース → offset解決（CLI `--offset` 指定時はその値を使用、未指定時は `parse_toc` の戻り値を使用） → `validate_toc` → `flatten_toc` → `build_output_plan` → `validate_output_plan` → `split_pdf` の制御フロー。`split_pdf` には進捗ログを出力するコールバックを渡す
 
 ### 3.5 終了コード
 
@@ -380,19 +380,21 @@ pdf-toc-splitter/
 
 ### 3.7 ログ出力
 
-`print` による標準出力への進捗表示：
+`print` による標準出力への進捗表示。2000ページ超のPDFも想定するため、各ファイルの進捗は書き込み完了直後にリアルタイムで出力する（全ファイル分割後の事後出力は不可）：
 
 ```
 [INFO] Loaded TOC: 4 entries (depth=1), offset=4
 [INFO] Input PDF: example.pdf (94 pages)
 [INFO] Output directory: ./output
 [INFO] Splitting...
-[INFO]   1/4: 01_第1章_はじめに_p5-19.pdf (15 pages)
-[INFO]   2/4: 02_第2章_基本概念_p20-46.pdf (27 pages)
-[INFO]   3/4: 03_第3章_応用_p47-84.pdf (38 pages)
-[INFO]   4/4: 04_付録A_用語集_p85-94.pdf (10 pages)
+[INFO]   1/4: 01_第1章_はじめに_p5-19.pdf (15 pages)    ← 1件目の書き込み完了直後に出力
+[INFO]   2/4: 02_第2章_基本概念_p20-46.pdf (27 pages)   ← 2件目の書き込み完了直後に出力
+[INFO]   3/4: 03_第3章_応用_p47-84.pdf (38 pages)       ← 3件目の書き込み完了直後に出力
+[INFO]   4/4: 04_付録A_用語集_p85-94.pdf (10 pages)     ← 4件目の書き込み完了直後に出力
 [INFO] Done. 4 files created in ./output
 ```
+
+進捗ログのタイミングは `split_pdf` の `on_progress` コールバックで実現する。`cli.py` がコールバックを渡し、`splitter.py` は各ファイルの書き込み完了直後にコールバックを呼び出す。これにより `splitter.py` 自体は標準出力に直接書き込まず、ログ形式の制御は `cli.py` 側に集約される。
 
 バリデーション警告がある場合：
 
@@ -428,7 +430,6 @@ pdf-toc-splitter/
 - 子エントリの範囲が親範囲を超過
 - インデント飛び級（レベル1→レベル3）
 - ネスト4階層以上
-- 同一階層でのページ範囲重複
 
 #### 暫定値の扱い
 
@@ -441,6 +442,9 @@ pdf-toc-splitter/
 #### 警告系
 
 - 同一階層のエントリ間にページギャップがある場合
+- 同一階層でページ範囲が重複している場合に警告が出ること（エラーではないこと）
+- 境界ページの共有（例: `25-25` と `25-26`）で警告が出るが処理は続行されること
+- 完全に同一の範囲（例: 両方 `1-10`）でも警告止まりで処理は続行されること
 
 ### 4.2 splitter のテスト（`src/tests/test_splitter.py`）
 
@@ -452,6 +456,13 @@ pdf-toc-splitter/
 - depth 2 での分割と出力ファイル順序（深さ優先）の検証
 - depth 3 での分割
 - offset 適用後のページ抽出が正しいことの検証
+- ページ範囲が重複するエントリ（例: `25-25` と `25-26`）の分割で、該当ページが両方のPDFに含まれること
+
+#### 進捗コールバック
+
+- `on_progress` を渡した場合、各ファイルの書き込み完了直後にコールバックが呼ばれること
+- コールバックの引数（current_index, total_count, entry, filename）が正しいこと
+- `on_progress=None`（デフォルト）の場合でもエラーにならないこと
 
 #### ファイル名生成
 
@@ -470,12 +481,14 @@ pdf-toc-splitter/
 #### CLIオプション
 
 - `--dry-run`: ファイルが生成されず、一覧が標準出力に出ること
+- `--dry-run` + ファイル名重複: エラーとして検出されること
 - `--validate-only`: バリデーションのみ実行され、PDFが生成されないこと
 - `--validate-only` + `0-0` エントリ: 警告として報告されること
 - `--validate-only` + `offset: TODO`: 警告として報告されること
 - `--offset`: Markdown内 offset より CLI 指定が優先されること
 - `--offset` 指定時に Markdown内の `offset: TODO` がエラーにならないこと（CLI値で上書きされるため）
 - `--depth` の範囲外指定（0, 4以上）のエラーハンドリング
+- 分割実行時にファイル別の進捗ログ（`[INFO]   1/N: ...`）が出力に含まれること
 
 #### 終了コード
 

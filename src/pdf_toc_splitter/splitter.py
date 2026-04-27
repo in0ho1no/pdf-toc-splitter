@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
@@ -99,7 +100,13 @@ def validate_output_plan(plan: list[tuple[TocEntry, str]]) -> list[str]:
     return errors
 
 
-def split_pdf(input_path: str, plan: list[tuple[TocEntry, str]], output_dir: str, offset: int) -> list[str]:
+def split_pdf(
+    input_path: str,
+    plan: list[tuple[TocEntry, str]],
+    output_dir: str,
+    offset: int,
+    on_progress: Callable[[int, int, TocEntry, str], None] | None = None,
+) -> list[str]:
     """出力計画に基づきPDFを分割し、出力ファイルパスのリストを返す。
 
     出力ディレクトリが存在しない場合は自動作成する。既存ファイルは上書きする。
@@ -109,6 +116,8 @@ def split_pdf(input_path: str, plan: list[tuple[TocEntry, str]], output_dir: str
         plan: build_output_plan が返した (エントリ, ファイル名) のリスト
         output_dir: 出力ディレクトリ
         offset: ページオフセット
+        on_progress: 各ファイルの書き込み完了直後に呼び出すコールバック。
+            引数は (current_index, total_count, entry, filename)（current_index は1始まり）。
 
     Returns:
         出力ファイルパスのリスト
@@ -118,8 +127,9 @@ def split_pdf(input_path: str, plan: list[tuple[TocEntry, str]], output_dir: str
 
     reader = PdfReader(input_path)
     output_files: list[str] = []
+    total = len(plan)
 
-    for entry, filename in plan:
+    for i, (entry, filename) in enumerate(plan, 1):
         writer = PdfWriter()
         phys_start = entry.start_page + offset
         phys_end = entry.end_page + offset
@@ -132,5 +142,8 @@ def split_pdf(input_path: str, plan: list[tuple[TocEntry, str]], output_dir: str
             writer.write(f)
 
         output_files.append(str(file_path))
+
+        if on_progress is not None:
+            on_progress(i, total, entry, filename)
 
     return output_files
