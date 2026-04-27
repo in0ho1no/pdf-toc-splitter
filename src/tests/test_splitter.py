@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pypdf import PdfReader, PdfWriter
 
+from pdf_toc_splitter.cli import main
 from pdf_toc_splitter.splitter import build_output_plan, generate_filename, split_pdf, validate_output_plan
 from pdf_toc_splitter.toc_parser import TocEntry
 
@@ -202,3 +203,201 @@ class TestSplitPdf:
         output_files = split_pdf(str(pdf_path), plan, str(tmp_path / 'output'), offset=0)
         filenames = [Path(f).name for f in output_files]
         assert filenames == ['01_Ch1_p1-3.pdf', '01-01_1.1_p1-2.pdf', '02_Ch2_p4-6.pdf']
+
+
+class TestCli:
+    def test_normal_exit_code_0(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+        out_dir = tmp_path / 'output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-o', str(out_dir)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        assert len(list(out_dir.glob('*.pdf'))) == 2
+
+    def test_nonexistent_pdf_exits_1(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n', encoding='utf-8')
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(tmp_path / 'nonexistent.pdf'), str(toc_path)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    def test_nonexistent_toc_exits_1(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(tmp_path / 'nonexistent.md')])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    def test_validation_error_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1 1-5\n', encoding='utf-8')  # フォーマット不正（コロンなし）
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 2
+
+    def test_validate_only_pass(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '--validate-only'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert '[ERROR]' not in out
+        assert 'バリデーション完了' in out
+
+    def test_validate_only_provisional_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 0-0\n', encoding='utf-8')
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '--validate-only'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        assert '[WARN]' in capsys.readouterr().out
+
+    def test_validate_only_todo_offset_warns(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('<!-- offset: TODO -->\n- Ch1: 1-5\n', encoding='utf-8')
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '--validate-only'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        assert '[WARN]' in capsys.readouterr().out
+
+    def test_dry_run_shows_file_list(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+        out_dir = tmp_path / 'dry_output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '--dry-run', '-o', str(out_dir)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert '01_Ch1_p1-5.pdf' in out
+        assert '02_Ch2_p6-10.pdf' in out
+
+    def test_dry_run_no_files_created(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+        out_dir = tmp_path / 'dry_output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '--dry-run', '-o', str(out_dir)])
+        with pytest.raises(SystemExit):
+            main()
+        assert not out_dir.exists()
+
+    def test_offset_cli_overrides_markdown(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # offset: 0 in markdown, --offset 4 from CLI → physical pages shifted by 4
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 14)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('<!-- offset: 0 -->\n- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+        out_dir = tmp_path / 'output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-o', str(out_dir), '--offset', '4'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        assert any('p5-9' in f.name for f in out_dir.glob('*.pdf'))
+
+    def test_offset_cli_overrides_todo(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 10)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('<!-- offset: TODO -->\n- Ch1: 1-5\n- Ch2: 6-10\n', encoding='utf-8')
+        out_dir = tmp_path / 'output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-o', str(out_dir), '--offset', '0'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+
+    def test_depth_out_of_range_exits_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n', encoding='utf-8')
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-d', '0'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code != 0
+
+    def test_depth_upper_out_of_range_exits_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n', encoding='utf-8')
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-d', '4'])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code != 0
+
+    def test_output_dir_auto_created(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n', encoding='utf-8')
+        out_dir = tmp_path / 'new_output'
+
+        monkeypatch.setattr('sys.argv', ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-o', str(out_dir)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        assert out_dir.exists()
+
+    def test_overwrite_existing_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        _create_pdf(pdf_path, 5)
+        toc_path = tmp_path / 'toc.md'
+        toc_path.write_text('- Ch1: 1-5\n', encoding='utf-8')
+        out_dir = tmp_path / 'output'
+        out_dir.mkdir()
+
+        argv = ['pdf-toc-splitter', str(pdf_path), str(toc_path), '-o', str(out_dir)]
+        monkeypatch.setattr('sys.argv', argv)
+        with pytest.raises(SystemExit):
+            main()
+        # 2回目の実行で上書き
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+        files = list(out_dir.glob('*.pdf'))
+        assert len(files) == 1
+        assert len(PdfReader(str(files[0])).pages) == 5
