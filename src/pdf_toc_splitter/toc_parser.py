@@ -151,7 +151,7 @@ def validate_toc(
         for i, e1 in enumerate(checkable):
             for e2 in checkable[i + 1 :]:
                 if e1.start_page <= e2.end_page and e2.start_page <= e1.end_page:
-                    errors.append(
+                    warnings.append(
                         f'行 {e1.line_no} と行 {e2.line_no}: 同一階層内でページ範囲が重複しています'
                         f' ({e1.start_page}-{e1.end_page} と {e2.start_page}-{e2.end_page})'
                     )
@@ -161,9 +161,7 @@ def validate_toc(
         for i in range(len(sorted_s) - 1):
             e1, e2 = sorted_s[i], sorted_s[i + 1]
             if e2.start_page > e1.end_page + 1:
-                warnings.append(
-                    f'行 {e1.line_no} と行 {e2.line_no}: ページ {e1.end_page + 1}〜{e2.start_page - 1} がカバーされていません'
-                )
+                warnings.append(f'行 {e1.line_no} と行 {e2.line_no}: ページ {e1.end_page + 1}〜{e2.start_page - 1} がカバーされていません')
 
     def _validate_entry(entry: TocEntry, parent: TocEntry | None) -> None:
         # フォーマット合致（番兵値 -1 はフォーマット不正）
@@ -182,10 +180,7 @@ def validate_toc(
         # インデント連続性
         expected_level = 1 if parent is None else parent.level + 1
         if entry.level != expected_level:
-            errors.append(
-                f'行 {entry.line_no}: インデントの飛び級があります'
-                f' (期待 level={expected_level}, 実際 level={entry.level})'
-            )
+            errors.append(f'行 {entry.line_no}: インデントの飛び級があります (期待 level={expected_level}, 実際 level={entry.level})')
 
         provisional = _is_provisional(entry)
         if provisional:
@@ -201,24 +196,15 @@ def validate_toc(
 
             # ページ範囲整合
             if entry.start_page > entry.end_page:
-                errors.append(
-                    f'行 {entry.line_no}: 開始ページ ({entry.start_page}) が終了ページ ({entry.end_page}) より大きいです'
-                )
+                errors.append(f'行 {entry.line_no}: 開始ページ ({entry.start_page}) が終了ページ ({entry.end_page}) より大きいです')
 
             # 総ページ数以内
             phys_end = entry.end_page + eff_offset
             if phys_end > total_pages:
-                errors.append(
-                    f'行 {entry.line_no}: offset 適用後の終了ページ ({phys_end}) が'
-                    f' 総ページ数 ({total_pages}) を超えています'
-                )
+                errors.append(f'行 {entry.line_no}: offset 適用後の終了ページ ({phys_end}) が 総ページ数 ({total_pages}) を超えています')
 
             # 子範囲が親範囲内（親が 0-0 の場合はスキップ）
-            if (
-                parent is not None
-                and not _is_provisional(parent)
-                and (entry.start_page < parent.start_page or entry.end_page > parent.end_page)
-            ):
+            if parent is not None and not _is_provisional(parent) and (entry.start_page < parent.start_page or entry.end_page > parent.end_page):
                 errors.append(
                     f'行 {entry.line_no}: 子エントリのページ範囲 ({entry.start_page}-{entry.end_page}) が'
                     f' 親の範囲 ({parent.start_page}-{parent.end_page}) を超えています'

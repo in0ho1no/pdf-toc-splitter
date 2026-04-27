@@ -113,10 +113,7 @@ class TestBuildOutputPlan:
         assert '_p5-19.pdf' in plan[0][1]
 
     def test_digit_overflow_auto_expand_and_warn(self, capsys: pytest.CaptureFixture[str]) -> None:
-        entries = [
-            _make_entry(f'Ch{i}', i, i, level=1, line_no=i)
-            for i in range(1, 12)
-        ]
+        entries = [_make_entry(f'Ch{i}', i, i, level=1, line_no=i) for i in range(1, 12)]
         plan = build_output_plan(entries, offset=0, prefix_digits=1)
         assert plan[9][1].startswith('10_')
         captured = capsys.readouterr()
@@ -172,6 +169,30 @@ class TestSplitPdf:
         plan = [(_make_entry('Ch1', 1, 3, line_no=1), '01_Ch1_p5-7.pdf')]
         output_files = split_pdf(str(pdf_path), plan, str(tmp_path / 'output'), offset=4)
         assert len(PdfReader(output_files[0]).pages) == 3
+
+    def test_boundary_shared_page_included_in_both_outputs(self, tmp_path: Path) -> None:
+        pdf_path = tmp_path / 'input.pdf'
+        writer = PdfWriter()
+        for page_no in range(1, 31):
+            writer.add_blank_page(width=600 + page_no, height=792)
+        with pdf_path.open('wb') as f:
+            writer.write(f)
+
+        plan = [
+            (_make_entry('S1', 25, 25, line_no=1), '01_S1_p25-25.pdf'),
+            (_make_entry('S2', 25, 26, line_no=2), '02_S2_p25-26.pdf'),
+        ]
+
+        output_files = split_pdf(str(pdf_path), plan, str(tmp_path / 'output'), offset=0)
+
+        first_reader = PdfReader(output_files[0])
+        second_reader = PdfReader(output_files[1])
+
+        assert len(first_reader.pages) == 1
+        assert len(second_reader.pages) == 2
+        assert float(first_reader.pages[0].mediabox.width) == 625.0
+        assert float(second_reader.pages[0].mediabox.width) == 625.0
+        assert float(second_reader.pages[1].mediabox.width) == 626.0
 
     def test_output_dir_auto_created(self, tmp_path: Path) -> None:
         pdf_path = tmp_path / 'input.pdf'
@@ -290,9 +311,7 @@ class TestCli:
             main()
         assert exc_info.value.code == 2
 
-    def test_validate_only_pass(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_validate_only_pass(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         pdf_path = tmp_path / 'input.pdf'
         _create_pdf(pdf_path, 10)
         toc_path = tmp_path / 'toc.md'
@@ -306,9 +325,7 @@ class TestCli:
         assert '[ERROR]' not in out
         assert 'バリデーション完了' in out
 
-    def test_validate_only_provisional_warns(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_validate_only_provisional_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         pdf_path = tmp_path / 'input.pdf'
         _create_pdf(pdf_path, 10)
         toc_path = tmp_path / 'toc.md'
@@ -320,9 +337,7 @@ class TestCli:
         assert exc_info.value.code == 0
         assert '[WARN]' in capsys.readouterr().out
 
-    def test_validate_only_todo_offset_warns(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_validate_only_todo_offset_warns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         pdf_path = tmp_path / 'input.pdf'
         _create_pdf(pdf_path, 10)
         toc_path = tmp_path / 'toc.md'
@@ -334,9 +349,7 @@ class TestCli:
         assert exc_info.value.code == 0
         assert '[WARN]' in capsys.readouterr().out
 
-    def test_dry_run_shows_file_list(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_dry_run_shows_file_list(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         pdf_path = tmp_path / 'input.pdf'
         _create_pdf(pdf_path, 10)
         toc_path = tmp_path / 'toc.md'
@@ -444,9 +457,7 @@ class TestCli:
         assert len(files) == 1
         assert len(PdfReader(str(files[0])).pages) == 5
 
-    def test_progress_log_output(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_progress_log_output(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         pdf_path = tmp_path / 'input.pdf'
         _create_pdf(pdf_path, 10)
         toc_path = tmp_path / 'toc.md'
@@ -460,9 +471,7 @@ class TestCli:
         assert '[INFO]   1/2:' in out
         assert '[INFO]   2/2:' in out
 
-    def test_dry_run_duplicate_filename_exits_2(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_dry_run_duplicate_filename_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         pdf_path = tmp_path / 'input.pdf'
         _create_pdf(pdf_path, 10)
         toc_path = tmp_path / 'toc.md'

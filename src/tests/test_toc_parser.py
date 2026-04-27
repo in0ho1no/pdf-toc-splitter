@@ -228,15 +228,17 @@ class TestValidateTocErrors:
     def test_page_range_overlap(self) -> None:
         e1 = TocEntry(title='Ch1', start_page=1, end_page=10, level=1, line_no=1)
         e2 = TocEntry(title='Ch2', start_page=8, end_page=20, level=1, line_no=2)
-        errors, _ = validate_toc([e1, e2], total_pages=100, offset=0)
-        assert any('重複' in e for e in errors)
+        errors, warnings = validate_toc([e1, e2], total_pages=100, offset=0)
+        assert not any('重複' in e for e in errors)
+        assert any('重複' in w for w in warnings)
 
     def test_page_range_overlap_at_boundary(self) -> None:
         # 終端と先頭が一致するケース [1,10] と [10,20] は重複
         e1 = TocEntry(title='Ch1', start_page=1, end_page=10, level=1, line_no=1)
         e2 = TocEntry(title='Ch2', start_page=10, end_page=20, level=1, line_no=2)
-        errors, _ = validate_toc([e1, e2], total_pages=100, offset=0)
-        assert any('重複' in e for e in errors)
+        errors, warnings = validate_toc([e1, e2], total_pages=100, offset=0)
+        assert not any('重複' in e for e in errors)
+        assert any('重複' in w for w in warnings)
 
     def test_no_errors_valid_toc(self, tmp_path: Path) -> None:
         path = write_toc(
@@ -298,8 +300,9 @@ class TestValidateTocProvisional:
         # 0-0 同士は重複チェック対象外
         e1 = TocEntry(title='不明1', start_page=0, end_page=0, level=1, line_no=1)
         e2 = TocEntry(title='不明2', start_page=0, end_page=0, level=1, line_no=2)
-        errors, _ = validate_toc([e1, e2], total_pages=100, offset=0, strict=False)
+        errors, warnings = validate_toc([e1, e2], total_pages=100, offset=0, strict=False)
         assert not any('重複' in e for e in errors)
+        assert not any('重複' in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
