@@ -65,14 +65,36 @@ pdf-toc-splitter book.pdf toc.md --offset 4
 
 ### 使用フロー
 
-```
-1. PDFビューアで元PDFを開き、offset を算出する
-   （本文1ページ目の物理ページ番号 − 1）
-2. 目次ページをAI（Claude等）に読み込ませ、toc.md を生成する
-   （prompts/toc_extraction_prompt.md のプロンプトを使用）
-3. toc.md に offset ディレクティブを記入し、内容を確認・修正する
-4. --dry-run で出力ファイル一覧を確認する
-5. 実際に分割を実行する
+```mermaid
+flowchart TD
+    A([分割したいPDFを用意]) --> B
+
+    B["📖 PDFビューアでoffsetを算出\n本文1ページ目の物理ページ番号 − 1\nexample: 物理5ページ目が印刷1ページ → offset=4"]
+    B --> C
+
+    C["✂️ 目次ページを別PDFに切り出す"]
+    C --> D
+
+    D["🤖 AIに目次PDFとプロンプトを渡す\nprompts/toc_extraction_prompt.md を使用"]
+    D --> E["toc.md が出力される"]
+    E --> F{offsetは\n記入済み?}
+
+    F -- AIが算出できた --> G
+    F -- TODOのまま --> F1["toc.md にoffsetを手入力"]
+    F1 --> G
+
+    G["📝 toc.md を確認・修正\n0-0 の修正、[?] の解消など"]
+    G --> H["$ pdf-toc-splitter input.pdf toc.md --validate-only"]
+    H --> I{エラーあり?}
+
+    I -- あり --> G
+    I -- なし --> J["$ pdf-toc-splitter input.pdf toc.md --dry-run"]
+    J --> K{出力ファイル名\nは想定通り?}
+
+    K -- 違う --> L{depthや\nオプション調整}
+    L --> J
+    K -- OK --> M["$ pdf-toc-splitter input.pdf toc.md -o ./output"]
+    M --> N([✅ output/ に分割PDFが生成される])
 ```
 
 ## 目次Markdownのフォーマット
