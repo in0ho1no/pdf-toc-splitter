@@ -46,6 +46,8 @@ pdf-toc-splitter <input.pdf> <toc.md>
 
 ### 使用例
 
+ルートにて`uv run` + 以下
+
 ```bash
 # 最上位章のみ分割（デフォルト）
 pdf-toc-splitter book.pdf toc.md -o ./chapters
