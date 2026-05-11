@@ -56,6 +56,29 @@
 		},
 
 		"autoDocstring.docstringFormat": "google",
+
+		// markdown settings
+		"markdown.updateLinksOnFileMove.enabled": "always",
+		"markdown.validate.enabled": true,
+		"markdown.suggest.paths.enabled": true,
+		"markdown.preview.scrollPreviewWithEditor": false,
+		"markdown.preview.scrollEditorWithPreview": false,
+		"markdown.copyFiles.destination": {
+			"**/*": "img/"		// 画像コピペ時の保存先指定
+		},
+		"[markdown]": {
+			"editor.wordWrap":"on",
+			"editor.snippetSuggestions": "top",
+			"editor.scrollBeyondLastLine": false,
+			"files.trimTrailingWhitespace": false,
+			"files.insertFinalNewline": true,
+			"editor.padding.bottom": 250,
+		},
+
+		// Markdown Preview Enhanced
+		"markdown-preview-enhanced.breakOnSingleNewLine": false,
+		"markdown-preview-enhanced.scrollSync": false,
+		"markdown-preview-enhanced.automaticallyShowPreviewOfMarkdownBeingEdited": true,
 	}
 }
 
