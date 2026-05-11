@@ -2,11 +2,27 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python デバッガー: main",
+            "name": "Python デバッガー: pdf-toc-splitter",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}\\src\\main.py",
+            "module": "pdf_toc_splitter",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python デバッガー: pdf-toc-splitter (with args)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pdf_toc_splitter",
+            "console": "integratedTerminal",
+            "args": [
+                "examples/sample.pdf",
+                "examples/example_toc.md",
+                "--dry-run",
+                "--depth",
+                "2",
+                "-o",
+                "output/debug"
+            ]
         }
     ]
 }
