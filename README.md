@@ -107,26 +107,16 @@ PDF パスを省略して、チャット内で対話的に指定することも�
 #extract-toc.prompt.md #file:docs/toc-pages.pdf
 ```
 
-#### Ollama + Gemma 4 E4B
+#### Ollama + 任意のMODEL
 
-Ollama 上で Gemma 4 E4B を利用できる前提で、任意のチャット UI から同じプロンプトを渡せる。
+Ollama 上で 任意のMODEL を利用できる環境で、UI から同じプロンプトを渡す。
 
-1. 元PDFから目次ページだけを切り出し、たとえば `docs/toc-pages.pdf` を作成する
+1. 元PDFから目次ページだけを切り出し、たとえば `any/path/to/toc-pages.pdf` を作成する
 2. `prompts/extract_toc.md` の「--- プロンプト開始 ---」から「--- プロンプト終了 ---」までをコピーする
-3. Ollama に接続しているチャット UI で Gemma 4 E4B を選ぶ
+3. Ollama に接続しているチャット UI で 任意のMODEL を選ぶ
 4. そのチャットに `docs/toc-pages.pdf` を添付する
 5. あわせて、コピーしたプロンプトをそのまま送信する
 6. 返ってきた Markdown を `toc.md` として保存する
-
-入力例:
-
-```text
-以下のプロンプトに従って、添付したPDFの目次を `toc.md` 形式で出力してください。
-
---- プロンプト開始 ---
-[prompts/extract_toc.md の本文をここに貼り付け]
---- プロンプト終了 ---
-```
 
 PDF 添付に対応していない UI を使う場合は、目次ページのテキストを抽出してチャットに貼り付け、
 「PDF 添付の代わりに以下のテキストを目次として扱ってください」と明示して同じプロンプトを併用する。
