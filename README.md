@@ -47,7 +47,7 @@ offset = 物理1ページ目のプレビューページ番号 − 1
 --> D
 
 D["AIに目次PDFとプロンプトを渡す
-prompts/toc_extraction_prompt.md
+prompts/extract_toc.md
 を使用"]
 D --> E["toc.md が出力される"]
 E --> F{offsetは\n記入済み?}
@@ -75,6 +75,8 @@ M --> N([output/ に分割PDFが生成される])
 AIに用意してもらうか、手動で用意する。
 
 ### AIに用意してもらう場合
+
+共通して、目次抽出用の指示文は `prompts/extract_toc.md` を使用する。
 
 #### Claude Code
 
@@ -104,6 +106,20 @@ PDF パスを省略して、チャット内で対話的に指定することも�
 ```ps
 #extract-toc.prompt.md #file:docs/toc-pages.pdf
 ```
+
+#### Ollama + 任意のMODEL
+
+Ollama 上で 任意のMODEL を利用できる環境で、UI から同じプロンプトを渡す。
+
+1. 元PDFから目次ページだけを切り出し、たとえば `any/path/to/toc-pages.pdf` を作成する
+2. `prompts/extract_toc.md` の「--- プロンプト開始 ---」から「--- プロンプト終了 ---」までをコピーする
+3. Ollama に接続しているチャット UI で 任意のMODEL を選ぶ
+4. そのチャットに `docs/toc-pages.pdf` を添付する
+5. あわせて、コピーしたプロンプトをそのまま送信する
+6. 返ってきた Markdown を `toc.md` として保存する
+
+PDF 添付に対応していない UI を使う場合は、目次ページのテキストを抽出してチャットに貼り付け、
+「PDF 添付の代わりに以下のテキストを目次として扱ってください」と明示して同じプロンプトを併用する。
 
 #### AgentにPDF を渡せない場合
 
