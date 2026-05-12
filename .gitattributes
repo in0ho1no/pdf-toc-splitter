@@ -26,12 +26,15 @@
 *.tsx    text eol=lf
 
 *.json   text eol=lf
+*.code-workspace text eol=lf
 *.yml    text eol=lf
 *.yaml   text eol=lf
 *.toml   text eol=lf
 *.ini    text eol=lf
 
 *.md     text eol=lf
+*.markdown text eol=lf
+*.mdx    text eol=lf
 *.txt    text eol=lf
 
 # シェルスクリプト（CRLF混入防止）
@@ -51,6 +54,7 @@
 .gitmodules                    text eol=lf
 
 git-setup/COMMIT_TEMPLATE      text eol=lf
+git-setup/hooks/*              text eol=lf
 
 # よくある拡張子なしファイル
 Makefile                       text eol=lf
@@ -82,6 +86,11 @@ package-lock.json   text eol=lf
 *.tiff binary
 *.gif binary
 *.ico binary
+*.webp binary
+*.avif binary
+
+# テキストベース画像
+*.svg text eol=lf
 
 # 実行ファイル
 *.exe binary
@@ -136,6 +145,8 @@ out/**    linguist-generated
 ###############################################################################
 
 *.md linguist-documentation
+*.markdown linguist-documentation
+*.mdx linguist-documentation
 
 ###############################################################################
 # バイナリ扱いの明示（念のため）

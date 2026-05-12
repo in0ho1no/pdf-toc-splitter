@@ -14,8 +14,41 @@
 		},
 
 		// フォント設定
-		"editor.fontFamily": "Consolas, 'Meiryo UI','Courier New', monospace",
+		"editor.fontFamily": "Consolas, 'Cascadia Mono', 'SF Mono', Menlo, Monaco, 'Courier New', monospace",
 
+		// Copilot のコード提案は無効化しつつ、通常のサジェストは利用する
+		"github.copilot.enable": {
+			"*": false
+		},
+		"editor.suggestOnTriggerCharacters": true,
+		"editor.wordBasedSuggestions": "matchingDocuments",
+		"editor.inlineSuggest.enabled": false,
+		"editor.quickSuggestions": {
+			"other": true,
+			"comments": false,
+			"strings": false
+		},
+
+		// 編集時の見通しを良くする
+		"editor.rulers": [120],
+		"editor.tabSize": 4,
+		"editor.matchBrackets": "always",
+		"editor.bracketPairColorization.enabled": true,
+		"editor.guides.bracketPairs": true,
+		"editor.guides.highlightActiveBracketPair": true,
+		"editor.guides.indentation": true,
+		"editor.guides.highlightActiveIndentation": true,
+		"editor.stickyScroll.enabled": true,
+		"editor.showFoldingControls": "always",
+		"editor.wordSeparators": "./\\()\"'-:,.;<>~!@# ○$%^&*|+=[]{}`~?．。，、（）「」［］｛｝《》『』【】てにをはがのともへでや",
+
+		// git settings
+		// VSCode標準のGit blame(行末に表示される最終コミット情報)を無効化
+		"git.blame.editorDecoration.enabled": false,
+		// GitLensのCurrent Line Blame(カーソル行に表示される履歴情報)を無効化
+		"gitlens.currentLine.enabled": false,
+
+		// Python settings
 		"editor.defaultFormatter": "charliermarsh.ruff",
 		"editor.formatOnSave": true,
 		"editor.codeActionsOnSave": {
@@ -24,19 +57,28 @@
 
 		"autoDocstring.docstringFormat": "google",
 
-		// VSCode標準のGit blame(行末に表示される最終コミット情報)を無効化
-		"git.blame.editorDecoration.enabled": false,
-		// GitLensのCurrent Line Blame(カーソル行に表示される履歴情報)を無効化
-		"gitlens.currentLine.enabled": false,
-
-		// 自動補完を無効化
-		"editor.suggestOnTriggerCharacters": false,
-		"editor.wordBasedSuggestions": "off",
-		"editor.inlineSuggest.enabled": false,
-		"editor.quickSuggestions": {
-			"other": "off",
-			"comments": "off",
-			"strings": "off",
+		// markdown settings
+		"markdown.updateLinksOnFileMove.enabled": "always",
+		"markdown.validate.enabled": true,
+		"markdown.suggest.paths.enabled": true,
+		"markdown.preview.scrollPreviewWithEditor": false,
+		"markdown.preview.scrollEditorWithPreview": false,
+		"markdown.copyFiles.destination": {
+			"**/*": "img/"		// 画像コピペ時の保存先指定
 		},
+		"[markdown]": {
+			"editor.wordWrap":"on",
+			"editor.snippetSuggestions": "top",
+			"editor.scrollBeyondLastLine": false,
+			"files.trimTrailingWhitespace": false,
+			"files.insertFinalNewline": true,
+			"editor.padding.bottom": 250,
+		},
+
+		// Markdown Preview Enhanced
+		"markdown-preview-enhanced.breakOnSingleNewLine": false,
+		"markdown-preview-enhanced.scrollSync": false,
+		"markdown-preview-enhanced.automaticallyShowPreviewOfMarkdownBeingEdited": true,
 	}
 }
+
